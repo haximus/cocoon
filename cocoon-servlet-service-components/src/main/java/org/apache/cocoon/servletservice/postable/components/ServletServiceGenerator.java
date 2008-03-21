@@ -21,36 +21,51 @@ import java.util.Map;
 
 import org.apache.avalon.framework.parameters.ParameterException;
 import org.apache.avalon.framework.parameters.Parameters;
+import org.apache.commons.io.IOUtils;
+import org.apache.excalibur.source.Source;
+import org.apache.excalibur.source.SourceException;
+
 import org.apache.cocoon.ProcessingException;
 import org.apache.cocoon.components.source.util.SourceUtil;
+import org.apache.cocoon.core.xml.SAXParser;
 import org.apache.cocoon.environment.SourceResolver;
 import org.apache.cocoon.generation.AbstractGenerator;
 import org.apache.cocoon.servletservice.postable.PostableSource;
-import org.apache.cocoon.util.avalon.CLLoggerWrapper;
-import org.apache.commons.io.IOUtils;
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
-import org.apache.excalibur.source.Source;
-import org.apache.excalibur.source.SourceException;
-import org.apache.cocoon.core.xml.SAXParser;
+
 import org.xml.sax.SAXException;
 
 /**
- * 
+ * <p>The generator takes only <code>service</code> parameter that should contain the URL of the called service.<br>
+ * Use <code>servlet:</code> source for that purpose.</p>
  *
+ * <p>FIXME: Provide a link to the documents discussing servlet (and sitemap) services.</p>
+ *
+ * @cocoon.sitemap.component.documentation
+ * The <code>ServletServiceGenerator</code> POSTs its input data to a called service and passes the XML data returned
+ * by the service down the pipeline.
+ * @cocoon.sitemap.component.name servletService
+ * @cocoon.sitemap.component.documentation.caching Not Implemented
+ *
+ * @version $Id$
+ * @since 1.0.0
  */
 public class ServletServiceGenerator extends AbstractGenerator {
-	
-	private Log logger = LogFactory.getLog(getClass());
+
 	private SAXParser saxParser;
-	
+
 	private PostableSource servletSource;
-	
-    public void init() {
-        this.enableLogging(new CLLoggerWrapper(this.logger));
+
+
+    public SAXParser getSaxParser() {
+        return saxParser;
     }
 
-	/* (non-Javadoc)
+    public void setSaxParser(SAXParser saxParser) {
+        this.saxParser = saxParser;
+    }
+
+
+    /**
 	 * @see org.apache.cocoon.generation.Generator#generate()
 	 */
 	public void generate() throws IOException, SAXException, ProcessingException {
@@ -61,7 +76,7 @@ public class ServletServiceGenerator extends AbstractGenerator {
         }
 	}
 
-	/* (non-Javadoc)
+	/**
 	 * @see org.apache.cocoon.sitemap.SitemapModelComponent#setup(org.apache.cocoon.environment.SourceResolver, java.util.Map, java.lang.String, org.apache.avalon.framework.parameters.Parameters)
 	 */
 	public void setup(SourceResolver resolver, Map objectModel, String src, Parameters par) throws ProcessingException, SAXException, IOException {
@@ -72,7 +87,7 @@ public class ServletServiceGenerator extends AbstractGenerator {
 		} catch (ParameterException e) {
 			throw new ProcessingException(e);
 		}
-		
+
         Source inputSource;
         try {
         	try {
@@ -81,25 +96,16 @@ public class ServletServiceGenerator extends AbstractGenerator {
         		throw new ProcessingException("Resolved '" + service + "' to source that is not postable. Use servlet: protocol for service calls.");
         	}
             inputSource = super.resolver.resolveURI(src);
-            
+
         } catch (SourceException se) {
             throw SourceUtil.handle("Error during resolving of '" + src + "'.", se);
         }
-        
+
         if (getLogger().isDebugEnabled()) {
         	getLogger().debug("Source " + service + " resolved to " + servletSource.getURI());
             getLogger().debug("Source " + super.source + " resolved to " + inputSource.getURI());
         }
-        
+
         IOUtils.copy(inputSource.getInputStream(), servletSource.getOutputStream());
 	}
-
-	public SAXParser getSaxParser() {
-		return saxParser;
-	}
-
-	public void setSaxParser(SAXParser saxParser) {
-		this.saxParser = saxParser;
-	}
-
 }

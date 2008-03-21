@@ -5,9 +5,9 @@
  * The ASF licenses this file to You under the Apache License, Version 2.0
  * (the "License"); you may not use this file except in compliance with
  * the License.  You may obtain a copy of the License at
- * 
+ *
  *      http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -40,19 +40,21 @@ import javax.servlet.ServletException;
 import javax.servlet.ServletRequest;
 import javax.servlet.ServletResponse;
 import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
 
 import org.apache.cocoon.servletservice.util.ServletContextWrapper;
-import org.apache.excalibur.source.Source;
-import org.apache.excalibur.source.SourceResolver;
-import org.springframework.beans.factory.BeanFactory;
-import org.springframework.web.context.support.WebApplicationContextUtils;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 
 /**
  * @version $Id$
+ * @since 1.0.0
  */
-public class ServletServiceContext extends ServletContextWrapper {
-    
+public class ServletServiceContext extends ServletContextWrapper implements Absolutizable {
+
     public static final String SUPER = "super";
+
+    private final Log logger = LogFactory.getLog(ServletServiceContext.class);
 
     private Map attributes = new Hashtable();
     private Servlet servlet;
@@ -60,47 +62,28 @@ public class ServletServiceContext extends ServletContextWrapper {
     private String contextPath;
     private Map properties;
     private Map connections;
+    private Map connectionServiceNames;
 
+    private String serviceName;
 
     /*
-     * (non-Javadoc)
-     * 
-     * @see javax.servlet.ServletContext#getAttribute(java.lang.String)
-     */
-    /*
-     *  TODO ineritance of attributes from the parent context is only
+     *  TODO inheritance of attributes from the parent context is only
      *  partly implemented: removeAttribute and getAttributeNames
-     *  doesn't respect inheritance yet.  
+     *  doesn't respect inheritance yet.
      */
     public Object getAttribute(String name) {
         Object value = this.attributes.get(name);
         return value != null ? value : super.getAttribute(name);
     }
 
-    /*
-     * (non-Javadoc)
-     * 
-     * @see javax.servlet.ServletContext#setAttribute(java.lang.String,
-     *      java.lang.Object)
-     */
     public void setAttribute(String name, Object value) {
         this.attributes.put(name, value);
     }
 
-    /*
-     * (non-Javadoc)
-     * 
-     * @see javax.servlet.ServletContext#removeAttribute(java.lang.String)
-     */
     public void removeAttribute(String name) {
         this.attributes.remove(name);
     }
 
-    /*
-     * (non-Javadoc)
-     * 
-     * @see javax.servlet.ServletContext#getAttributeNames()
-     */
     public Enumeration getAttributeNames() {
         return Collections.enumeration(this.attributes.keySet());
     }
@@ -113,92 +96,54 @@ public class ServletServiceContext extends ServletContextWrapper {
             this.attributes = map;
     }
 
-    /*
-     * (non-Javadoc)
-     * 
-     * @see javax.servlet.ServletContext#getResource(java.lang.String)
-     */
     public URL getResource(String path) throws MalformedURLException {
-        // hack for getting a file protocol or other protocols that can be used as context
-        // path in the getResource method in the servlet context
-        if (!(contextPath.startsWith("file:") || contextPath.startsWith("/")
-                || contextPath.indexOf(':') == -1)) {
-            SourceResolver resolver = null;
-            Source source = null;
-            try {
-                BeanFactory factory = WebApplicationContextUtils.getRequiredWebApplicationContext(this);
-                resolver = (SourceResolver) factory.getBean(SourceResolver.ROLE);
-                source = resolver.resolveURI(contextPath);
-                contextPath = source.getURI();
-            } catch (IOException e) {
-                throw new MalformedURLException("Could not resolve " + contextPath);
-            } finally {
-                if (resolver != null)
-                    resolver.release(source);
-            }
-        }
-
         // HACK: allow file:/ URLs for reloading of sitemaps during development
         if (this.contextPath.startsWith("file:")) {
             return new URL("file", null, this.contextPath.substring("file:".length()) + path);
-        } else {
-            if (this.contextPath.length() != 0 && this.contextPath.charAt(0) != '/')
-                throw new MalformedURLException("The contextPath must be empty or start with '/' "
-                        + this.contextPath);
-            
-            // prefix the path with the servlet context resolve and resolve in the embeding
-            // servlet context
-            return super.getResource(this.contextPath + path);
         }
+
+        // prefix the path with the servlet context resolve and resolve in the embedding
+        // servlet context
+        return super.getResource(this.contextPath + path);
     }
 
-    /*
-     * (non-Javadoc)
-     * 
-     * @see javax.servlet.ServletContext#getRealPath(java.lang.String)
-     */
     public String getRealPath(String path) {
         // We better don't assume that blocks are unpacked
         return null;
     }
 
-    /*
-     * (non-Javadoc)
-     * 
-     * @see javax.servlet.ServletContext#getInitParameter(java.lang.String)
-     */
     // FIXME, this should be defined in the config instead
     public String getInitParameter(String name) {
-        if (this.properties == null)
+        if (this.properties == null) {
             return null;
+        }
+
         String value = (String) this.properties.get(name);
         // Ask the super servlet for the property
         if (value == null) {
             ServletContext superContext = this.getNamedContext(SUPER);
-            if (superContext != null)
+            if (superContext != null) {
                 value = superContext.getInitParameter(name);
+            }
         }
+
         // Ask the parent context
         if (value == null) {
-            super.getInitParameter(name);
+            value = super.getInitParameter(name);
         }
+
         return value;
     }
 
-    /*
-     * (non-Javadoc)
-     * 
-     * @see javax.servlet.ServletContext#getInitParameterNames()
-     */
     public Enumeration getInitParameterNames() {
         Vector names = new Vector();
-        
+
         // add all names of the parent servlet context
         Enumeration enumeration = super.getInitParameterNames();
         while (enumeration.hasMoreElements()) {
             names.add(enumeration.nextElement());
         }
-        
+
         // add names of the super servlet
         ServletContext superContext = this.getNamedContext(SUPER);
         if (superContext != null) {
@@ -216,11 +161,6 @@ public class ServletServiceContext extends ServletContextWrapper {
         return names.elements();
     }
 
-    /*
-     * (non-Javadoc)
-     * 
-     * @see javax.servlet.ServletContext#getResourceAsStream(java.lang.String)
-     */
     public InputStream getResourceAsStream(String path) {
         try {
             return this.getResource(path).openStream();
@@ -231,33 +171,23 @@ public class ServletServiceContext extends ServletContextWrapper {
         }
     }
 
-    /*
-     * (non-Javadoc)
-     * 
-     * @see javax.servlet.ServletContext#getContext(java.lang.String)
-     */
     public ServletContext getContext(String uripath) {
         return null;
     }
 
-    /*
-     * (non-Javadoc)
-     * 
-     * @see javax.servlet.ServletContext#getMajorVersion()
-     */
     public int getMajorVersion() {
         return 2;
     }
 
     /*
      * (non-Javadoc)
-     * 
+     *
      * @see javax.servlet.ServletContext#getMinorVersion()
      */
     public int getMinorVersion() {
         return 3;
     }
-    
+
     private Collection getDirectoryList(File file, String pathPrefix) {
         ArrayList filenames = new ArrayList();
 
@@ -276,24 +206,19 @@ public class ServletServiceContext extends ServletContextWrapper {
         return filenames;
     }
 
-    /*
-     * (non-Javadoc)
-     * 
-     * @see javax.servlet.ServletContext#getResourcePaths(java.lang.String)
-     */
     public Set getResourcePaths(String path) {
+        if (path == null) {
+            return Collections.EMPTY_SET;
+        }
+
         String pathPrefix;
         if (this.contextPath.startsWith("file:")) {
             pathPrefix = this.contextPath.substring("file:".length());
         } else {
             pathPrefix = this.contextPath;
         }
-        
+
         path = pathPrefix + path;
-        
-        if (path == null) {
-            return Collections.EMPTY_SET;
-        }
 
         File file = new File(path);
 
@@ -307,48 +232,28 @@ public class ServletServiceContext extends ServletContextWrapper {
         return set;
     }
 
-    /*
-     * (non-Javadoc)
-     * 
-     * @see javax.servlet.ServletContext#getRequestDispatcher(java.lang.String)
-     */
     public RequestDispatcher getRequestDispatcher(String path) {
         PathDispatcher dispatcher = new PathDispatcher(path);
         return dispatcher.exists() ? dispatcher : null;
     }
 
-    /*
-     * (non-Javadoc)
-     * 
-     * @see javax.servlet.ServletContext#getNamedDispatcher(java.lang.String)
-     */
     public RequestDispatcher getNamedDispatcher(String name) {
         NamedDispatcher dispatcher = new NamedDispatcher(name);
         return dispatcher.exists() ? dispatcher : null;
     }
 
-    /*
-     * (non-Javadoc)
-     * 
-     * @see javax.servlet.ServletContext#getServerInfo()
-     */
     public String getServerInfo() {
         // TODO Auto-generated method stub
         return null;
     }
 
-    /*
-     * (non-Javadoc)
-     * 
-     * @see javax.servlet.ServletContext#getServletContextName()
-     */
     public String getServletContextName() {
         // TODO Auto-generated method stub
         return null;
     }
 
     // Servlet service specific methods
-    
+
     /**
      * Set the servlet of the context
      * @param servlet
@@ -371,21 +276,36 @@ public class ServletServiceContext extends ServletContextWrapper {
         } else {
             // another servlet service
             servletServiceContext = (ServletServiceContext) this.getNamedContext(servletServiceName);
-            if (servletServiceContext == null)
+            if (servletServiceContext == null) {
                 throw new URISyntaxException(uri.toString(), "Unknown servlet service name");
+            }
         }
 
         String mountPath = servletServiceContext.getMountPath();
-        if (mountPath == null)
+        if (mountPath == null) {
             throw new URISyntaxException(uri.toString(),
-                    "No mount point for this URI");
-        if (mountPath.endsWith("/"))
+                                         "No mount point for this URI");
+        }
+        if (mountPath.endsWith("/")) {
             mountPath = mountPath.substring(0, mountPath.length() - 1);
+        }
+
         String absoluteURI = mountPath + uri.getSchemeSpecificPart();
-        log("Resolving " + uri.toString() + " to " + absoluteURI);
+        if (logger.isInfoEnabled()) {
+            logger.info("Resolving " + uri.toString() + " to " + absoluteURI);
+        }
+
         return new URI(absoluteURI);
     }
-    
+
+    public String getServiceName(String connectionName) {
+        return (String) this.connectionServiceNames.get(connectionName);
+    }
+
+    public String getServiceName() {
+        return this.serviceName;
+    }
+
     /**
      * Get the context of a servlet service with a given name.
      */
@@ -394,12 +314,22 @@ public class ServletServiceContext extends ServletContextWrapper {
         if (this.connections == null) {
             return null;
         }
-        
+
         Servlet servlet =
             (Servlet) this.connections.get(name);
-        return servlet != null ? ((ServletServiceContextAware)servlet).getServletServiceContext() : null;
+        if (servlet == null && !name.equals(SUPER)) {
+        	Servlet _super = ((Servlet)this.connections.get(SUPER));
+        	if (_super != null) {
+        		ServletContext c = _super.getServletConfig().getServletContext();
+        		if (c instanceof ServletServiceContext)
+        			return ((ServletServiceContext)c).getNamedContext(name);
+
+        		return null;
+        	}
+        }
+        return servlet != null ? servlet.getServletConfig().getServletContext() : null;
     }
-        
+
     /**
      * @param mountPath The mountPath to set.
      */
@@ -413,7 +343,7 @@ public class ServletServiceContext extends ServletContextWrapper {
     public String getMountPath() {
         return this.mountPath;
     }
-    
+
     /**
      * @param contextPath
      */
@@ -435,73 +365,71 @@ public class ServletServiceContext extends ServletContextWrapper {
         this.connections = connections;
     }
 
+    /**
+     * @param connections the service names of the connections
+     */
+    public void setConnectionServiceNames(Map connectionServletServiceNames) {
+        this.connectionServiceNames = connectionServletServiceNames;
+    }
+
+    /**
+     * @param serviceName the name of the
+     */
+    public void setServiceName(String serviceName) {
+        this.serviceName = serviceName;
+    }
+
     protected class NamedDispatcher implements RequestDispatcher {
 
         private String servletServiceName;
-        private boolean superCall = false;
+
+        private boolean superCall;
+
         private ServletContext context;
 
         public NamedDispatcher(String servletServiceName) {
             this.servletServiceName = servletServiceName;
             this.superCall = SUPER.equals(this.servletServiceName);
 
-            // Call to a named servlet service that exists in the current context
+            // Call to a named servlet service that exists in the current
+            // context
             this.context = ServletServiceContext.this.getNamedContext(this.servletServiceName);
-            if (this.context == null) {
-                // If there is a super servlet service, the connection might
-                // be defined there instead.
-                ServletServiceContext superContext =
-                    (ServletServiceContext) ServletServiceContext.this.getNamedContext(SUPER);
-                if (superContext != null) {
-                    this.context = superContext.getNamedContext(this.servletServiceName);
-                    this.superCall = true;
-                }
-            }
         }
 
         protected boolean exists() {
             return this.context != null;
         }
 
-        /*
-         * (non-Javadoc)
-         * 
-         * @see javax.servlet.RequestDispatcher#forward(javax.servlet.ServletRequest,
-         *      javax.servlet.ServletResponse)
-         */
-        public void forward(ServletRequest request, ServletResponse response)
-                throws ServletException, IOException {
+        public void forward(ServletRequest request, ServletResponse response) throws ServletException, IOException {
             // Call to named servlet service
 
-            ServletServiceContext.this.log("Enter processing in servlet service " + this.servletServiceName);
-            RequestDispatcher dispatcher =
-                this.context.getRequestDispatcher(((HttpServletRequest)request).getPathInfo());
+            if (logger.isInfoEnabled()) {
+                logger.info("Enter processing in servlet service " + this.servletServiceName);
+            }
+            RequestDispatcher dispatcher = this.context.getRequestDispatcher(((HttpServletRequest) request)
+                            .getPathInfo());
             if (dispatcher != null && dispatcher instanceof PathDispatcher) {
-                ((PathDispatcher)dispatcher).forward(request, response, this.superCall);
+                ((PathDispatcher) dispatcher).forward(request, response, this.superCall);
             } else {
                 // Cannot happen
                 throw new IllegalStateException();
             }
-            ServletServiceContext.this.log("Leaving processing in servlet service " + this.servletServiceName);
+            if (logger.isInfoEnabled()) {
+                logger.info("Leaving processing in servlet service " + this.servletServiceName);
+            }
         }
 
-        /*
-         * (non-Javadoc)
-         * 
-         * @see javax.servlet.RequestDispatcher#include(javax.servlet.ServletRequest,
-         *      javax.servlet.ServletResponse)
-         */
-        public void include(ServletRequest request, ServletResponse response)
-                throws ServletException, IOException {
+        public void include(ServletRequest request, ServletResponse response) throws ServletException, IOException {
             throw new UnsupportedOperationException();
         }
     }
-    
+
     /**
-     *  Limited functionality, assumes that there is at most one servlet in the context
+     * Limited functionality, assumes that there is at most one servlet in the
+     * context
      */
     private class PathDispatcher implements RequestDispatcher {
-        
+
         // Ignores path, as the assumed only servlet within the context is
         // implicitly mounted on '/*'
         private PathDispatcher(String path) {
@@ -511,40 +439,55 @@ public class ServletServiceContext extends ServletContextWrapper {
             return ServletServiceContext.this.servlet != null;
         }
 
-        /* (non-Javadoc)
-         * @see javax.servlet.RequestDispatcher#forward(javax.servlet.ServletRequest, javax.servlet.ServletResponse)
-         */
-        public void forward(ServletRequest request, ServletResponse response)
-        throws ServletException, IOException {
-            this.forward(request, response, false);
+        public void forward(ServletRequest request, ServletResponse response) throws ServletException, IOException {
+            forward(request, response, false);
         }
 
         protected void forward(ServletRequest request, ServletResponse response, boolean superCall)
-        throws ServletException, IOException {
+                        throws ServletException, IOException {
             try {
+                HttpServletResponseBufferingWrapper wrappedResponse = new HttpServletResponseBufferingWrapper((HttpServletResponse)response);
+                // FIXME: I think that Cocoon should always set status code on
+                // its own
+                wrappedResponse.setStatus(HttpServletResponse.SC_OK);
                 if (!superCall) {
                     // It is important to set the current context each time
                     // a new context is entered, this is used for the servlet
                     // protocol
-                    CallStackHelper.enterServlet(ServletServiceContext.this);
+                    CallStackHelper.enterServlet(ServletServiceContext.this, (HttpServletRequest) request,
+                                    wrappedResponse);
                 } else {
-                    // A super servlet service should be called in the context of
-                    // the called servlet service to get polymorphic calls resolved
-                    // in the right way. We still need to register the
+                    // A super servlet service should be called in the context
+                    // of the called servlet service to get polymorphic calls
+                    // resolved in the right way. We still need to register the
                     // current context for resolving super calls relative it.
-                    CallStackHelper.enterSuperServlet(ServletServiceContext.this);
-                }                        
-                ServletServiceContext.this.servlet.service(request, response);
+                    CallStackHelper.enterSuperServlet(ServletServiceContext.this, (HttpServletRequest) request,
+                                    wrappedResponse);
+                }
+
+                ServletServiceContext.this.servlet.service(request, wrappedResponse);
+
+                int status = wrappedResponse.getStatusCode();
+                NamedDispatcher _super = (NamedDispatcher) ServletServiceContext.this.getNamedDispatcher(SUPER);
+                if (status == HttpServletResponse.SC_NOT_FOUND && _super != null) {
+                    //if servlet returned NOT_FOUND (404) and has super servlet declared let's reset everything and ask the super servlet
+                    
+                    //wrapping object resets underlying response as well 
+                    wrappedResponse.resetBufferedResponse();
+                    //here we don't need to pass wrappedResponse object because it's not our concern to buffer response anymore
+                    //this avoids many overlapping buffers
+                    _super.forward(request, response);
+                } else {
+                    wrappedResponse.flushBufferedResponse();
+                }
             } finally {
                 CallStackHelper.leaveServlet();
             }
         }
 
-        /* (non-Javadoc)
-         * @see javax.servlet.RequestDispatcher#include(javax.servlet.ServletRequest, javax.servlet.ServletResponse)
-         */
         public void include(ServletRequest request, ServletResponse response) throws ServletException, IOException {
             throw new UnsupportedOperationException();
         }
     }
+
 }

@@ -18,6 +18,8 @@ package org.apache.cocoon.servletservice;
 
 import javax.servlet.ServletContext;
 import javax.servlet.ServletException;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
 
 import org.apache.cocoon.callstack.CallFrame;
 import org.apache.cocoon.callstack.CallStack;
@@ -27,7 +29,7 @@ import org.apache.cocoon.callstack.environment.CallFrameHelper;
  * Helper class used for geting hold on the current servlet service
  *
  * @version $Id$
- * @since 2.2 
+ * @since 1.0.0
  */
 public class CallStackHelper {
 
@@ -40,11 +42,11 @@ public class CallStackHelper {
      * <p>This method should never raise an exception, except when the
      * parameters are not set!</p>
      *
-     * @throws ServletException if block is null
+     * @throws ServletException if at least one of the parameters is null
      */
-    public static void enterServlet(ServletContext context)
+    public static void enterServlet(ServletContext context, HttpServletRequest request, HttpServletResponse response)
     throws ServletException {
-        enterServlet(context, false);
+        enterServlet(context, request, response, false);
     }
 
     /**
@@ -53,29 +55,31 @@ public class CallStackHelper {
      * <p>This method should never raise an exception, except when the
      * parameters are not set!</p>
      *
-     * @throws ServletException if the context is null
+     * @throws ServletException if at least one of the parameters is null
      */
-    public static void enterSuperServlet(ServletContext context)
+    public static void enterSuperServlet(ServletContext context, HttpServletRequest request, HttpServletResponse response)
     throws ServletException {
-        enterServlet(context, true);
+        enterServlet(context, request, response, true);
     }
 
-    private static void enterServlet(ServletContext context, boolean superCall)
+    private static void enterServlet(ServletContext context, HttpServletRequest request, HttpServletResponse response, boolean superCall)
     throws ServletException {
-        if (null == context) {
-            throw new ServletException("The context is not set.");
-        }
+        if (null == context) throw new ServletException("The context is not set.");
+        if (null == request) throw new ServletException("The request is not set.");
+        if (null == response) throw new ServletException("The response is not set.");
+
 
         CallStack.enter();
-        CallStack.getCurrentFrame().setAttribute(SUPER_CALL, new Boolean(superCall));
+        CallStack.getCurrentFrame().setAttribute(SUPER_CALL, Boolean.valueOf(superCall));
         CallFrameHelper.setContext(context);
+        CallFrameHelper.setRequest(request);
+        CallFrameHelper.setResponse(response);
     }
 
     /**
      * This hook must be called each time a servlet service is left.
      *
-     * <p>It's the counterpart to the {@link #enterServlet(ServletContext)}
-     * method.</p>
+     * <p>It's the counterpart to the {@link #enterServlet} method.</p>
      */
     public static void leaveServlet() {
         CallStack.leave();
@@ -83,21 +87,25 @@ public class CallStackHelper {
 
     /**
      * Use this method for getting the context that should be used for
-     * resolving a polymorphic servlet protocol call 
+     * resolving a polymorphic servlet protocol call.
+     *
      * @return a servlet context
      */
     public static ServletContext getBaseServletContext() {
-        for(int i = CallStack.size() - 1; i >= 0; i--) {
+        for (int i = CallStack.size() - 1; i >= 0; i--) {
             CallFrame frame = CallStack.frameAt(i);
-            if (frame.hasAttribute(SUPER_CALL) && !((Boolean)frame.getAttribute(SUPER_CALL)).booleanValue())
+            if (frame.hasAttribute(SUPER_CALL) && !((Boolean) frame.getAttribute(SUPER_CALL)).booleanValue()) {
                 return (ServletContext) frame.getAttribute(CallFrameHelper.CONTEXT_OBJECT);
+            }
         }
+
         return null;
     }
 
     /**
      * Use this method for getting the context that should be used for
-     * resolving a servlet protocol call to a super servlet service 
+     * resolving a servlet protocol call to a super servlet service.
+     *
      * @return a servlet context
      */
     public static ServletContext getCurrentServletContext() {

@@ -5,9 +5,9 @@
  * The ASF licenses this file to You under the Apache License, Version 2.0
  * (the "License"); you may not use this file except in compliance with
  * the License.  You may obtain a copy of the License at
- * 
+ *
  *      http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -25,11 +25,11 @@ import org.apache.cocoon.callstack.CallStack;
 
 /**
  * A set of constants and methods to access the content of the call frame.
+ *
  * <p>
  * The call frame is used to pass information about the Request, Response and
  * Context of the calling environment to components used while the call frame
- * is active.
- * <p>
+ * is active.</p>
  *
  * @version $Id$
  */
@@ -47,7 +47,7 @@ public final class CallFrameHelper {
     private CallFrameHelper() {
         // Forbid instantiation
     }
-    
+
     public static final void setEnvironment(HttpServletRequest request, HttpServletResponse response, ServletContext context) {
         CallFrame frame = CallStack.getCurrentFrame();
         frame.setAttribute(REQUEST_OBJECT, request);
@@ -78,4 +78,5 @@ public final class CallFrameHelper {
     public static final void setContext(ServletContext context) {
         CallStack.getCurrentFrame().setAttribute(CONTEXT_OBJECT, context);
     }
+
 }

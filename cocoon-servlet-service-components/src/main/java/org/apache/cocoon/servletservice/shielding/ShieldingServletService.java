@@ -5,9 +5,9 @@
  * The ASF licenses this file to You under the Apache License, Version 2.0
  * (the "License"); you may not use this file except in compliance with
  * the License.  You may obtain a copy of the License at
- * 
+ *
  *      http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -23,12 +23,14 @@ import javax.servlet.Servlet;
 import javax.servlet.ServletConfig;
 import javax.servlet.ServletException;
 
-import org.apache.cocoon.servletservice.ServletService;
 
 import org.springframework.aop.framework.ProxyFactory;
 
 /**
  * A servlet for use in cocoon blocks that adds shielded classloading support.
+ *
+ * @version $Id$
+ * @since 1.0.0
  */
 public class ShieldingServletService extends ServletService {
 
@@ -78,7 +80,7 @@ public class ShieldingServletService extends ServletService {
         this.classLoaderFactory = classLoaderFactory;
     }
 
-    protected Servlet createEmbeddedServlet(String embeddedServletClassName, ServletConfig servletConfig) 
+    protected Servlet createEmbeddedServlet(String embeddedServletClassName, ServletConfig servletConfig)
     throws ServletException {
         // create the classloader
         Map parameters = new HashMap();
@@ -90,15 +92,15 @@ public class ShieldingServletService extends ServletService {
                 this.shieldedClasses);
         parameters.put(ShieldedGroupClassLoaderManager.CLASSLOADER_FACTORY_PARAM,
                 this.classLoaderFactory);
-        
-        this.classLoader = 
-            ShieldedGroupClassLoaderManager.getClassLoader(getServletServiceContext(), parameters);
+
+        this.classLoader =
+            ShieldedGroupClassLoaderManager.getClassLoader(getServletContext(), parameters);
 
         // Create the servlet
         final ClassLoader oldClassLoader = Thread.currentThread().getContextClassLoader();
         try {
             Thread.currentThread().setContextClassLoader(this.classLoader);
-            
+
             Class servletClass = this.classLoader.loadClass(embeddedServletClassName);
             Servlet embeddedServlet = (Servlet) servletClass.newInstance();
             ProxyFactory proxyFactory = new ProxyFactory(embeddedServlet);

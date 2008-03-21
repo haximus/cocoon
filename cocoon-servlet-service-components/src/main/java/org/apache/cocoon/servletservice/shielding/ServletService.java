@@ -5,16 +5,16 @@
  * The ASF licenses this file to You under the Apache License, Version 2.0
  * (the "License"); you may not use this file except in compliance with
  * the License.  You may obtain a copy of the License at
- * 
+ *
  *      http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.cocoon.servletservice;
+package org.apache.cocoon.servletservice.shielding;
 
 import java.io.IOException;
 import java.util.Enumeration;
@@ -29,6 +29,7 @@ import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
+import org.apache.cocoon.servletservice.ServletServiceContext;
 import org.apache.cocoon.servletservice.util.ServletConfigurationWrapper;
 import org.springframework.beans.BeansException;
 import org.springframework.beans.factory.BeanNameAware;
@@ -42,12 +43,23 @@ import org.springframework.web.context.support.GenericWebApplicationContext;
 import org.springframework.web.context.support.WebApplicationContextUtils;
 
 /**
+ * <p>
+ * This class is only used as a base class for the
+ * {@link ShieldingServletService}. For non shielded servlet services, the
+ * {@link org.apache.cocoon.servletservice.spring.ServletFactoryBean} should be
+ * used.
+ * </p>
+ * <p>
+ * TODO: Make the shielding work together with the ServletBeanFactory.
+ * </p>
+ *
  * @version $Id$
+ * @since 1.0.0
  */
 public class ServletService extends HttpServlet
     implements ApplicationContextAware, ServletContextAware, BeanNameAware,
-    InitializingBean, DisposableBean, ServletServiceContextAware {
-    
+    InitializingBean, DisposableBean {
+
     private ServletServiceContext servletServiceContext;
     private String embeddedServletClass;
     private Servlet embeddedServlet;
@@ -58,12 +70,11 @@ public class ServletService extends HttpServlet
     public ServletService() {
         this.servletServiceContext = new ServletServiceContext();
     }
-    
+
     /* (non-Javadoc)
      * @see javax.servlet.GenericServlet#init(javax.servlet.ServletConfig)
      */
     public void init(ServletConfig servletConfig) throws ServletException {
-        super.init(servletConfig);
         this.servletServiceContext.setServletContext(servletConfig.getServletContext());
 
         // create a sub container that resolves paths relative to the block
@@ -83,7 +94,7 @@ public class ServletService extends HttpServlet
             new ServletConfigurationWrapper(servletConfig, this.servletServiceContext) {
 
                 // FIXME: The context should get the init parameters from the
-                // config rather than the oposite way around.
+                // config rather than the opposite way around.
                 public String getInitParameter(String name) {
                     return super.getServletContext().getInitParameter(name);
                 }
@@ -93,15 +104,17 @@ public class ServletService extends HttpServlet
                 }
             };
 
-        // create and initialize the embeded servlet
+        super.init(blockServletConfig);
+
+        // create and initialize the embedded servlet
         this.embeddedServlet = createEmbeddedServlet(this.embeddedServletClass, blockServletConfig);
         this.embeddedServlet.init(blockServletConfig);
         this.servletServiceContext.setServlet(this.embeddedServlet);
     }
-    
+
     /**
      * Creates and initializes the embedded servlet
-     * @param string 
+     * @param string
      * @throws ServletException
      */
     protected Servlet createEmbeddedServlet(String embeddedServletClassName, ServletConfig servletConfig)
@@ -124,17 +137,10 @@ public class ServletService extends HttpServlet
     }
 
     public void destroy() {
-        this.embeddedServlet.destroy();        
+        this.embeddedServlet.destroy();
         super.destroy();
     }
-    
-    /**
-     * @return the servletServiceContext
-     */
-    public ServletContext getServletServiceContext() {
-        return this.servletServiceContext;
-    }
-    
+
     public void setApplicationContext(ApplicationContext applicationContext) throws BeansException {
         this.parentContainer = applicationContext;
     }
@@ -148,20 +154,20 @@ public class ServletService extends HttpServlet
     }
 
     public void setMountPath(String mountPath) {
-        this.servletServiceContext.setMountPath(mountPath);        
+        this.servletServiceContext.setMountPath(mountPath);
     }
-    
+
     public String getMountPath() {
         return this.servletServiceContext.getMountPath();
     }
-    
+
     /**
      * The path to the blocks resources relative to the servlet context URL,
      * must start with an '/'.
      * @param blockContextURL
      */
-    // FIXME: would like to throw an exeption if the form of the url is faulty,
-    // what is the prefered way of handling faulty properties in Spring?
+    // FIXME: would like to throw an exception if the form of the url is faulty,
+    // what is the preferred way of handling faulty properties in Spring?
     public void setBlockContextURL(String blockContextURL) {
         this.servletServiceContext.setContextPath(blockContextURL);
     }
@@ -173,7 +179,7 @@ public class ServletService extends HttpServlet
     public void setProperties(Map properties) {
         this.servletServiceContext.setInitParams(properties);
     }
-    
+
     public void setConnections(Map connections) {
         this.servletServiceContext.setConnections(connections);
     }
@@ -199,7 +205,7 @@ public class ServletService extends HttpServlet
             public String getServletName() {
                 return ServletService.this.beanName;
             }
-            
+
         };
         this.init(servletConfig);
     }

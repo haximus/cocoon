@@ -5,30 +5,33 @@
  * The ASF licenses this file to You under the Apache License, Version 2.0
  * (the "License"); you may not use this file except in compliance with
  * the License.  You may obtain a copy of the License at
- * 
- *      http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.cocoon.servletservice;
+package org.apache.cocoon.servletservice.util;
 
-import javax.servlet.ServletContext;
+import javax.servlet.ServletInputStream;
+
+import java.io.IOException;
 
 /**
- * Inteface for making the servlet service context of a servlet service
- * available. It is needed for inter servlet communication in the servlet
- * service framework. It is normaly introduced by an AOP mixin.
- * 
+ * Always empty stream.
+ *
  * @version $Id$
+ * @since 1.0.0
  */
-public interface ServletServiceContextAware {
-    /**
-     * The servlet context used for inter servlet service communication
-     * @return
-     */
-    public ServletContext getServletServiceContext();
+public class NullServletInputStream extends ServletInputStream {
+
+    public static final NullServletInputStream INSTANCE = new NullServletInputStream();
+
+    public int read() throws IOException {
+        return -1;
+    }
+
 }

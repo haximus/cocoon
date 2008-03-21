@@ -26,26 +26,34 @@ import org.apache.cocoon.processing.ProcessInfoProvider;
 import org.apache.excalibur.source.Source;
 import org.apache.excalibur.source.SourceFactory;
 
+/**
+ * A factory for <code>service-consumer:</code> source.
+ *
+ * @see ServletServiceConsumerSource
+ * @version $Id$
+ * @since 1.0.0
+ */
 public class ServletServiceConsumerSourceFactory implements SourceFactory {
-	
-	private ProcessInfoProvider processInfoProvider;
 
-	public Source getSource(String location, Map parameters) throws IOException, MalformedURLException {
-		HttpServletRequest request = processInfoProvider.getRequest();
-		if (!"POST".equals(request.getMethod()))
-			throw new MalformedURLException("Cannot create consumer source for request that is not POST.");
-		return new ServletServiceConsumerSource(request);
-	}
+    private ProcessInfoProvider processInfoProvider;
 
-	public void release(Source source) {
-	}
+    public Source getSource(String location, Map parameters) throws IOException, MalformedURLException {
+        HttpServletRequest request = processInfoProvider.getRequest();
+        if (!"POST".equals(request.getMethod())) {
+            throw new MalformedURLException("Cannot create consumer source for request that is not POST.");
+        }
 
-	public ProcessInfoProvider getProcessInfoProvider() {
-		return processInfoProvider;
-	}
+        return new ServletServiceConsumerSource(request);
+    }
 
-	public void setProcessInfoProvider(ProcessInfoProvider processInfoProvider) {
-		this.processInfoProvider = processInfoProvider;
-	}
+    public void release(Source source) {
+    }
 
+    public ProcessInfoProvider getProcessInfoProvider() {
+        return processInfoProvider;
+    }
+
+    public void setProcessInfoProvider(ProcessInfoProvider processInfoProvider) {
+        this.processInfoProvider = processInfoProvider;
+    }
 }
